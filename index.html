@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Solo Cameraman — digital camera agent</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="styles.css">
+<link rel="manifest" href="manifest.json">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cameraman">
+<meta name="theme-color" content="#101418">
+<link rel="apple-touch-icon" href="icon-180.png">
+</head>
+<body>
+<header id="topbar">
+  <span><span class="rec-dot"></span><span id="sessionState">Setup</span></span>
+  <h1>Solo Cameraman</h1>
+  <span class="sub">digital camera agent for solo creators</span>
+  <span class="spacer"></span>
+  <span class="timer" id="timer">00:00</span>
+  <button id="btnView" type="button">Simple view</button>
+</header>
+
+<div class="welcome-overlay" id="welcome">
+  <section class="panel welcome-card">
+    <h2>Welcome</h2>
+    <p class="welcome-sub">Your AI cameraman for solo shoots — talk, get directed, keep only the good takes.</p>
+    <ol class="welcome-steps">
+      <li><strong>Talk</strong> — say photos or video, name the occasion, lock the checklist.</li>
+      <li><strong>Roll</strong> — it frames you, zooms to what you show, and pauses the bad takes.</li>
+      <li><strong>Keep</strong> — best photos starred, video saved with the pauses cut out.</li>
+    </ol>
+    <div class="row">
+      <button id="btnWelcomeStart" class="primary" type="button">Start — talk to your cameraman</button>
+    </div>
+  </section>
+</div>
+
+<section class="panel simple" id="simplePanel">
+  <h2>Talk to your cameraman</h2>
+  <div class="simple-agent" id="simpleAgent" aria-live="polite">Hi! Photos or a video — what are we making today?</div>
+  <div class="row simple-btns">
+    <button id="btnTalk" class="primary" type="button">Talk</button>
+    <button id="btnSimpleCamera" type="button">Start camera</button>
+    <button id="btnSimpleReady" class="primary" type="button">I'm ready</button>
+    <button id="btnSimpleCapture" type="button">Capture</button>
+    <button id="btnSimpleStop" class="danger" type="button">Stop</button>
+  </div>
+  <div class="simple-next" id="simpleNext">Say “Talk”, then answer: photos or video?</div>
+</section>
+
+<main>
+  <div>
+    <section class="panel" id="setupPanel">
+      <h2>1 · Session setup</h2>
+      <div class="chat" id="setupChat" aria-live="polite"></div>
+      <div class="chips" id="setupChips"></div>
+      <div class="row" style="margin-bottom:10px">
+        <input type="text" id="setupInput" placeholder="Answer the agent…" style="flex:1">
+        <button id="btnSetupSend">Send</button>
+      </div>
+      <div class="row" style="margin-bottom:8px">
+        <button id="modeVideo" type="button">Video mode</button>
+        <button id="modePhoto" type="button">Photo mode</button>
+      </div>
+      <div class="templates" id="templateCards"></div>
+      <label class="small" for="occasion">Occasion — what is this video about?</label>
+      <input type="text" id="occasion" placeholder="e.g. Making biryani for YouTube">
+      <div class="row" style="margin-top:8px">
+        <div style="flex:1;min-width:140px">
+          <label class="small" for="userName">Your name (for voice alerts)</label>
+          <input type="text" id="userName" value="Bhanu">
+        </div>
+        <div style="flex:2;min-width:200px">
+          <label class="small" for="checklistEdit">Checklist — beats you must mention (comma separated)</label>
+          <textarea id="checklistEdit" rows="2"></textarea>
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button id="btnCamera">Start camera</button>
+        <button id="btnReady" class="primary" disabled>I'm ready — start recording</button>
+        <button id="btnStop" class="danger" disabled>Stop session</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <label style="font-size:13px"><input type="checkbox" id="voiceOn" checked> Voice alerts</label>
+        <label style="font-size:13px">Mode <select id="voiceMode" style="width:auto"><option value="quiet" selected>Quiet — issues only</option><option value="full">Full — narrates all</option></select></label>
+        <label style="font-size:13px"><input type="checkbox" id="listenOn"> Listen to mic</label>
+        <button id="btnMic" type="button">Enable mic</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>2 · Live camera (what the phone sees)</h2>
+      <div class="video-wrap">
+        <video id="cam" playsinline muted style="display:none"></video>
+        <canvas id="preview" class="frame" width="640" height="360"></canvas>
+      </div>
+      <div class="pills">
+        <span class="pill" id="pillFrame">Frame: —</span>
+        <span class="pill" id="pillPerson">You: —</span>
+        <span class="pill" id="pillSubject">Subject: —</span>
+        <span class="pill" id="pillZoom">Zoom: 1.0x</span>
+        <span class="pill" id="pillTopic">Topic: —</span>
+        <span class="pill" id="pillLight">Light: —</span>
+        <span class="pill" id="pillMic">Mic: Off</span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>3 · Program output (what gets recorded — auto zoom)</h2>
+      <canvas id="program" class="frame" width="640" height="360"></canvas>
+      <div class="row" style="margin-top:8px">
+        <span id="recStatus" style="font-size:13px;color:var(--muted)">Recording starts with the session.</span>
+        <span class="spacer" style="flex:1"></span>
+        <a id="download" style="display:none">Download recording</a>
+      </div>
+    </section>
+
+    <section class="panel" id="photoPanel" style="display:none">
+      <h2>Photo captures (every shot kept, best starred)</h2>
+      <div class="row" style="margin-bottom:8px">
+        <button id="btnCapture" class="primary">Capture photo</button>
+        <button id="btnBurst">Capture 5</button>
+        <button id="btnSaveBest" type="button">Save best</button>
+        <button id="btnSaveAll" type="button">Save all</button>
+        <span id="gestureState" style="font-size:13px;color:var(--muted)">Gesture: —</span>
+        <span id="photoBest" style="font-size:13px">No photos yet</span>
+      </div>
+      <div class="strip" id="photoStrip"></div>
+    </section>
+
+    <section class="panel" id="simPanel">
+      <h2>Demo helpers (no camera? test anyway)</h2>
+      <div class="sim-grid">
+        <label><input type="checkbox" id="simOn"> Simulate detections</label>
+        <label><input type="checkbox" id="simPerson" checked> Person in frame</label>
+        <label><input type="checkbox" id="simSubject" checked> Subject in frame</label>
+        <label><input type="checkbox" id="simHand"> Hand raised (gesture)</label>
+        <label>Person position <input type="range" id="simPersonX" min="5" max="95" value="50"></label>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="btnTestVoice">Test voice alert</button>
+        <span style="font-size:12.5px;color:var(--muted)">Tip: type in “Say it instead” below to act as the mic.</span>
+      </div>
+    </section>
+  </div>
+
+  <div>
+    <section class="panel">
+      <h2>Director status</h2>
+      <div id="directorLine" style="font-size:14px">Pick a template, start the camera or enable the simulator, then press “I'm ready”.</div>
+      <label class="small">Checklist coverage</label>
+      <div class="meter"><div id="coverageBar"></div></div>
+      <div class="row" style="margin-top:8px;font-size:13px;color:var(--muted)">
+        <span id="coverageText">0 / 0 covered</span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Checklist</h2>
+      <div class="checklist" id="checklistChips"></div>
+    </section>
+
+    <section class="panel" id="transcriptPanel">
+      <h2>What you said (live transcript)</h2>
+      <ul class="transcript" id="transcript"></ul>
+      <div class="hearing" id="hearingLine"></div>
+      <label class="small" for="sayBox">Say it instead (mic fallback / quick test)</label>
+      <div class="row">
+        <input type="text" id="sayBox" placeholder='e.g. "Now I add the onions to the biryani"' style="flex:1">
+        <button id="btnSay">Add line</button>
+      </div>
+    </section>
+
+    <section class="panel" id="logPanel">
+      <h2>Agent log</h2>
+      <ul class="log" id="eventLog"></ul>
+    </section>
+  </div>
+</main>
+
+<footer class="note">
+  Camera needs localhost or HTTPS. Vision runs on Meta SAM 3.1 and topics on Muse Spark,
+  both through this server (needs MODEL_API_KEY); without a key it falls back to
+  the simulator above. Frame snapshots sent for segmentation are never stored.
+</footer>
+
+<script src="agent-core.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

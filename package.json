@@ -1,0 +1,12 @@
+{
+  "name": "solo-cameraman",
+  "version": "0.1.0",
+  "description": "Digital camera agent for solo content creators (web prototype)",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test tests/core.test.js tests/wiring.test.js tests/proxy.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
