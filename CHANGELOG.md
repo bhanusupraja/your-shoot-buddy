@@ -2,6 +2,14 @@
 
 Every change requested this session, newest first. Build tags match `APP_BUILD` in `app.js` (shown in the Ready log line).
 
+## 2026-11-04-photogate — Photo capture never fires without the person
+- Asked: saying capture with nobody in frame took the photo, then said "person missing" after — warn before, and don't capture.
+- Root cause: the gate only covered occasions with a required noun (selfie/birthday/object) and stayed permissive on stale vision — custom/group sessions had no gate at all.
+- `agent-core.js`: new `photoCaptureHold` — every photo occasion needs the creator freshly in frame, plus the occasion subject (cake, named object); returns the missing noun, or `'stale'` when vision has no say yet.
+- `app.js`: `capturePhoto` holds with the reason spoken BEFORE (nothing captured); stale vision queues one verify-first capture ("Hold on — checking the frame first"), polls immediately, and fires or holds when fresh eyes land; vision failure drops the queue with the reason instead of hanging. Queue cleared on start/stop; burst extras stay silent while queued.
+- Note: object sessions now also need you in frame — pure product-only stills are blocked until asked for.
+- Tests: `photoCaptureHold` contract (all occasions + stale + subject stacking).
+
 ## 2026-11-04-welcome — Skipped-only reminders, bare-word beats, welcome screen
 - Asked: mid-take it nags "where is the outro" before the video is finished; add a home/welcome first page.
 - Reminder fix: mid-take nag + pause now fire only for beats you jumped over (`getSkipped`), never for unreached trailing beats — the outro can no longer be "forgotten" mid-story. Anything never said is still listed at Stop (unchanged backstop).

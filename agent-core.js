@@ -1197,6 +1197,19 @@
     return null;
   }
 
+  // Photo capture gate: no photo without the creator in frame — every
+  // occasion — plus the occasion subject (cake, named object). Returns null
+  // when the shot may fire, 'stale' when vision has no say yet (the caller
+  // verifies first instead of guessing), or the missing noun to speak about.
+  function photoCaptureHold(opts) {
+    opts = opts || {};
+    if (!opts.fresh) return 'stale';
+    if (!findDetection(opts.detections, 'person')) return 'person';
+    var need = photoRequiredNoun(opts.occasion, opts.subject);
+    if (need && need !== 'person' && !findDetection(opts.detections, need)) return need;
+    return null;
+  }
+
   // Agent parroting: the user reading the agent's own meta-lines back
   // ("got it sticking with your solo vlog", "say looks good or add x").
   // Only exact agent phrasing matches — legit occasions, edits, and
@@ -1404,6 +1417,7 @@
     isNewSessionRequest: isNewSessionRequest,
     isForgotQuery: isForgotQuery,
     photoRequiredNoun: photoRequiredNoun,
+    photoCaptureHold: photoCaptureHold,
     isAgentParrot: isAgentParrot,
     parseChecklistEdit: parseChecklistEdit,
     parseAwayNotice: parseAwayNotice,

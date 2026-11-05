@@ -529,6 +529,21 @@ test('mic watchdog: only error-driven churn counts as barren', () => {
   assert.equal(Core.micSessionBarren({ finals: 2, lastError: null, elapsedMs: 900 }), false);
 });
 
+test('photo capture gate: every occasion needs the person, plus its subject', () => {
+  const person = [{ label: 'person', score: 0.9, bbox: [0.3, 0.2, 0.4, 0.6] }];
+  const cake = [{ label: 'cake', score: 0.9, bbox: [0.4, 0.5, 0.2, 0.2] }];
+  const both = person.concat(cake);
+  assert.equal(Core.photoCaptureHold({ fresh: false, detections: both }), 'stale');
+  assert.equal(Core.photoCaptureHold({ fresh: true, detections: [], occasion: 'custom' }), 'person');
+  assert.equal(Core.photoCaptureHold({ fresh: true, detections: [], occasion: 'group' }), 'person');
+  assert.equal(Core.photoCaptureHold({ fresh: true, detections: [], occasion: 'selfie' }), 'person');
+  assert.equal(Core.photoCaptureHold({ fresh: true, detections: person, occasion: 'custom' }), null);
+  assert.equal(Core.photoCaptureHold({ fresh: true, detections: person, occasion: 'birthday' }), 'cake');
+  assert.equal(Core.photoCaptureHold({ fresh: true, detections: both, occasion: 'birthday' }), null);
+  assert.equal(Core.photoCaptureHold({ fresh: true, detections: person, occasion: 'object', subject: 'cake' }), 'cake');
+  assert.equal(Core.photoCaptureHold({ fresh: true, detections: both, occasion: 'object', subject: 'cake' }), null);
+});
+
 test('photo gate nouns: birthday needs cake, object its subject, selfie you', () => {
   assert.equal(Core.photoRequiredNoun('birthday'), 'cake');
   assert.equal(Core.photoRequiredNoun('selfie'), 'person');

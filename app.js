@@ -10,7 +10,7 @@
     return;
   }
 
-  var APP_BUILD = '2026-11-04-welcome'; // bump on every behavior change; shown in the Ready log
+  var APP_BUILD = '2026-11-04-photogate'; // bump on every behavior change; shown in the Ready log
 
   function $(id) { return document.getElementById(id); }
 
@@ -77,7 +77,8 @@
     lastSpokenText: '', lastSpokenMs: 0,
     awayUntilMs: 0, selfTalkUntilMs: 0,
     lastHeldLabel: null, lastHeldMs: 0, lastUserSpeechMs: 0,
-    recogStats: null, micDeadStreak: 0, micDeadWarned: false
+    recogStats: null, micDeadStreak: 0, micDeadWarned: false,
+    pendingCapture: null
   };
 
   function fmtTime(ms) {
@@ -1019,6 +1020,13 @@
       samInFlight = false;
       var allErr = results.every(function (r) { return r._err; });
       samFailStreak = allErr ? samFailStreak + 1 : 0;
+      // A queued verify-first capture must never hang: vision answered, so
+      // fire it now — or drop it with the reason when vision failed.
+      if (allErr && S.pendingCapture) {
+        S.pendingCapture = null;
+        addLog('Capture dropped — vision is not answering.', 'alert');
+        speak('My vision is not answering — check the server, then say capture again.', 'issue');
+      }
       if (allErr && samFailStreak >= 2 && !samFailLogged) {
         samFailLogged = true;
         addLog('SAM vision is failing — check the server log and MODEL_API_KEY. Keeping last detections.', 'alert');
@@ -1035,6 +1043,11 @@
       // waiting for the next 1s tick, so a walk-out pauses ~1s sooner.
       if (S.sessionActive) {
         try { tickAlerts(); } catch (e) { /* next interval covers it */ }
+      }
+      if (S.pendingCapture && S.sessionActive && S.mode === 'photo') {
+        var pc = S.pendingCapture;
+        S.pendingCapture = null;
+        try { capturePhoto(pc.via); } catch (e) { /* gate re-evaluates next ask */ }
       }
     });
     return true;
@@ -1880,15 +1893,31 @@
 
   function capturePhoto(via) {
     if (!S.sessionActive || S.mode !== 'photo') return;
-    // Required-subject gate: no cake, no birthday photo. Only enforced on
-    // fresh detections — blind/stale vision stays permissive.
-    var needNoun = Core.photoRequiredNoun(S.photoOccasion, S.photoSubject);
-    var freshDet = Date.now() - (S.lastSamOkMs || 0) < 6000;
-    if (needNoun && freshDet && !Core.findDetection(S.detections, needNoun)) {
-      var needMsg = needNoun === 'person'
+    // Everybody in frame first: no photo without the creator (any occasion),
+    // plus the occasion subject. Stale vision verifies instead of guessing.
+    var hold = Core.photoCaptureHold({
+      occasion: S.photoOccasion,
+      subject: S.photoSubject,
+      detections: S.detections,
+      fresh: Date.now() - (S.lastSamOkMs || 0) < 6000
+    });
+    if (hold === 'stale') {
+      // Verify-first: queue one capture, poll now, fire when fresh eyes land.
+      if (!S.pendingCapture) {
+        S.pendingCapture = { via: via || 'voice' };
+        addLog('Capture queued — checking the frame first…');
+        speak('Hold on — checking the frame first.', 'answer');
+        try { samPoll(); } catch (e) { /* the interval covers it */ }
+      } else if (via !== 'burst') {
+        speak('Still checking the frame — one moment.', 'answer');
+      }
+      return;
+    }
+    if (hold) {
+      var needMsg = hold === 'person'
         ? "I can't see you — step into the frame first, then say capture."
-        : 'No ' + needNoun + ' in frame — bring it in first, then say capture.';
-      addLog('Capture held — ' + needNoun + ' is not in frame.', 'alert');
+        : 'No ' + hold + ' in frame — bring it in first, then say capture.';
+      addLog('Capture held — ' + hold + ' is not in frame.', 'alert');
       speak(needMsg, 'answer');
       return;
     }
@@ -2085,6 +2114,7 @@
     S.selfTalkUntilMs = 0;
     S.lastHeldLabel = null;
     S.lastHeldMs = 0;
+    S.pendingCapture = null;
     S.chunks = [];
     S.startMs = Date.now();
     S.sessionActive = true;
@@ -2137,6 +2167,7 @@
   function stopSession() {
     S.sessionActive = false;
     S.bursting = false;
+    S.pendingCapture = null;
     S.checklistConfirmed = false;
     S.recordPaused = false;
     S.shutter.reset();

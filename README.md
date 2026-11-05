@@ -1,4 +1,4 @@
-# Solo Cameraman — digital camera agent for solo creators
+# Your shoot buddy — digital camera agent for solo creators
 
 Your notebook idea, running end to end: the agent watches the live frame, listens to
 what you say, and directs you by voice — like a cameraman standing next to the phone.
